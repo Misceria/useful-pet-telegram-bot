@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 
 
-from password_generator import generate_password
+from password_generator import generate_password_on_set_parameters
 from settings_reader import read_settings
 
 # Включаем логирование работы бота
@@ -19,8 +19,8 @@ logging.basicConfig(level=logging.INFO)
 settings = read_settings() 
 
 bot=Bot(token=settings["BOT_TOKEN"])
-bot_dispather = Dispatcher()
-bot_dispather["started_at"] = datetime.now()
+bot_dispatcher = Dispatcher()
+bot_dispatcher["started_at"] = datetime.now()
 
 generate_password_settings= {
     'length':16,
@@ -32,11 +32,12 @@ generate_password_settings= {
 }
 
 class Generation(StatesGroup):
-    alphabet = State()
-    length = State()
+    default_mode = State()
+    adding_alphabet_pass_gen = State()
+    choosing_password_length = State()
 
 # Обработка команды /start для ознакомления пользователя с функционалом и командами
-@bot_dispather.message(Command("start"))
+@bot_dispatcher.message(Command("start"))
 async def user_greetings(message: types.Message):
     await message.answer("""Привет-привет, я полезный питомец бот, но можешь называть меня <b>Тьюри</b>!
 Мой функционал пока в разработке, но предположительно Ты можешь воспользоваться следующими функциями:
@@ -45,22 +46,13 @@ async def user_greetings(message: types.Message):
     3) **IN PROGRESS** Поиск ссылок по вебстранице
     4) **IN PROGRESS** и т.д.""", parse_mode="HTML")
 
-
-# Данная функция создаёт надёжный пароль по требованиям пользователя
-@bot_dispather.message(Command('generate_password'))
-async def generate_password(message: types.Message, 
-                            length=generate_password_settings['length'], 
-                            special_symbols=generate_password_settings["special_symbols"], 
-                            digits=generate_password_settings["digits"], 
-                            Upper=generate_password_settings["Upper"], 
-                            Lower=generate_password_settings["Lower"], 
-                            personal_alphabet=generate_password_settings["personal_alphabet"]):
+def create_inline_for_generate_password():
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="Изменить название длины",
         callback_data="change_length")
     )
-    if special_symbols:
+    if generate_password_settings['special_symbols']:
         builder.add(types.InlineKeyboardButton(
             text="Отключить спец. символы",
             callback_data="change_special")
@@ -71,7 +63,7 @@ async def generate_password(message: types.Message,
             callback_data="change_special")
         )
 
-    if digits:
+    if generate_password_settings['digits']:
         builder.add(types.InlineKeyboardButton(
             text="Отключить цифры",
             callback_data="change_digits")
@@ -82,7 +74,7 @@ async def generate_password(message: types.Message,
             callback_data="change_digits")
         )
 
-    if Upper:
+    if generate_password_settings['Upper']:
         builder.add(types.InlineKeyboardButton(
             text="Отключить заглавные",
             callback_data="change_upper")
@@ -93,7 +85,7 @@ async def generate_password(message: types.Message,
             callback_data="change_upper")
         )
  
-    if Lower:
+    if generate_password_settings['Lower']:
         builder.add(types.InlineKeyboardButton(
             text="Отключить прописные",
             callback_data="change_lower")
@@ -113,74 +105,167 @@ async def generate_password(message: types.Message,
         text="Сгенерировать",
         callback_data="change_generate")
     )
+    return builder
 
-    await message.answer(f"""<u>Настройки:</u>
-Длина: {length} символов
-Специальные символы: {special_symbols}
-Цифры: {digits}
+
+# Данная функция создаёт надёжный пароль по требованиям пользователя
+@bot_dispatcher.message(Command('generate_password'))
+async def generate_password(message: types.Message, state: FSMContext):
+    builder = create_inline_for_generate_password()
+    message_generate_password = await message.answer(f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
 <u>Буквы:</u>
-Верхний регистр: {Upper}
-Нижний регистр: {Lower}
-<u>Дополнительные символы:</u> {personal_alphabet}""", parse_mode="HTML", reply_markup=builder.as_markup())
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""", parse_mode="HTML", reply_markup=builder.as_markup())
     
 
-@bot_dispather.callback_query(F.data.startswith("change_"))
-async def callbacks_num(message: types.message, callback: types.CallbackQuery, state: FSMContext):
+@bot_dispatcher.callback_query(lambda c: c.data.startswith('change_'))
+async def callbacks_num(callback: types.CallbackQuery, state: FSMContext):
     #user_value = user_data.get(callback.from_user.id, 0)
     action = callback.data.split("_")[1]
 
     if action == "special":
         generate_password_settings["special_symbols"] = not generate_password_settings["special_symbols"]
-        #await update_num_text(callback.message, user_value+1)
+        builder = create_inline_for_generate_password()
+        await bot.edit_message_text(
+                text=f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
+<u>Буквы:</u>
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""",
+                parse_mode="HTML",
+                chat_id = callback.message.chat.id,
+                message_id = callback.message.message_id,
+                reply_markup = builder.as_markup()
+            )
     elif action == "digits":
         generate_password_settings['digits'] = not generate_password_settings['digits']
-        #await update_num_text(callback.message, user_value-1)
+        builder = create_inline_for_generate_password()
+        await bot.edit_message_text(
+                text=f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
+<u>Буквы:</u>
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""",
+                parse_mode="HTML",
+                chat_id = callback.message.chat.id,
+                message_id = callback.message.message_id,
+                reply_markup = builder.as_markup()
+            )
     elif action == "upper":
         generate_password_settings['Upper'] = not generate_password_settings['Upper']
-        #await callback.message.edit_text(f"Итого: {user_value}")
+        builder = create_inline_for_generate_password()
+        await bot.edit_message_text(
+                text=f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
+<u>Буквы:</u>
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""",
+                parse_mode="HTML",
+                chat_id = callback.message.chat.id,
+                message_id = callback.message.message_id,
+                reply_markup = builder.as_markup()
+            )
     elif action == "lower":
         generate_password_settings['Lower'] = not generate_password_settings['Lower']
+        builder = create_inline_for_generate_password()
+        await bot.edit_message_text(
+                text=f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
+<u>Буквы:</u>
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""",
+                parse_mode="HTML",
+                chat_id = callback.message.chat.id,
+                message_id = callback.message.message_id,
+                reply_markup = builder.as_markup()
+            )
     elif action == 'alphabet':
-        await state.set_state(Generation.alphabet)
-        await message.answer("Введите без пробелов в одну строчку все необходимые символы\nПример:\nабвгд:1238,")
-         #await update_num_text(callback.message, user_value+1)
+        await state.set_state(Generation.adding_alphabet_pass_gen)
+        await callback.message.answer("Введите без пробелов в одну строчку все необходимые символы\nПример:\nабвгд:1238,")
+        await state.update_data(message_id = callback.message.message_id)
     elif action == "length":
-        await state.set_state(Generation.length)
-        await message.answer("Напишите необходимую длину пароля")
+        await state.set_state(Generation.choosing_password_length)
+        await callback.message.answer("Напишите необходимую длину пароля")
+        await state.update_data(message_id = callback.message.message_id)
     elif action == 'generate':
-        generate_password(length=generate_password_settings["length"], 
-                          special=generate_password_settings["special_symbols"], 
-                          digits=generate_password_settings["digits"], 
-                          Upper=generate_password_settings["Upper"], 
-                          Lower=generate_password_settings["Lower"], 
-                          personal_alphabet=generate_password_settings["personal_alphabet"])
+        password = generate_password_on_set_parameters(length=generate_password_settings["length"], 
+                                                        special=generate_password_settings["special_symbols"], 
+                                                        digits=generate_password_settings["digits"], 
+                                                        Upper=generate_password_settings["Upper"], 
+                                                        Lower=generate_password_settings["Lower"], 
+                                                        personal_alphabet=generate_password_settings["personal_alphabet"])
+        await callback.message.answer(f"Надёжный пароль: {password}")
     await callback.answer()
     
 
-@bot_dispather.message(Generation.alphabet)
-async def process_name(message: types.Message, callback: types.CallbackQuery, state: FSMContext):
-    generate_password_settings['alphabet'] = message.text
-    print(generate_password_settings)
-    state.clear()
-    await state.finish()
+@bot_dispatcher.message(Generation.adding_alphabet_pass_gen)
+async def process_name(message: types.Message, state: FSMContext):
+    generate_password_settings['personal_alphabet'] = message.text
+    builder = create_inline_for_generate_password()
+    data = await state.get_data()
+    await bot.edit_message_text(
+            text=f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
+<u>Буквы:</u>
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""",
+            parse_mode="HTML",
+            chat_id = message.chat.id,
+            message_id = data['message_id'],
+            reply_markup = builder.as_markup()
+        )
+    await state.set_state(Generation.default_mode)
+    
 
-
-@bot_dispather.message(Generation.length)
-async def process_name(message: types.Message, callback: types.CallbackQuery, state: FSMContext):
-    generate_password_settings['length'] = message.text
-    print(generate_password_settings)
-    state.clear()
-    await state.finish()
+@bot_dispatcher.message(Generation.choosing_password_length)
+async def process_name(message: types.Message, state: FSMContext):
+    generate_password_settings['length'] = int(message.text)
+    builder = create_inline_for_generate_password()
+    data = await state.get_data()
+    await bot.edit_message_text(
+            text=f"""<u>Настройки:</u>
+Длина: {generate_password_settings["length"]} символов
+Специальные символы: {generate_password_settings["special_symbols"]}
+Цифры: {generate_password_settings["digits"]}
+<u>Буквы:</u>
+Верхний регистр: {generate_password_settings["Upper"]}
+Нижний регистр: {generate_password_settings["Lower"]}
+<u>Дополнительные символы:</u> {generate_password_settings["personal_alphabet"]}""",
+            parse_mode="HTML",
+            chat_id = message.chat.id,
+            message_id = data['message_id'],
+            reply_markup = builder.as_markup()
+        )
+    await state.set_state(Generation.default_mode)
 
 # Вывод общей информации о боте
-@bot_dispather.message(Command('info'))
+@bot_dispatcher.message(Command('info'))
 async def info(message: types.message, started_at: str):
     await message.answer(f"""Бот запущен <b>{started_at.strftime("%d-%b-%Y %H:%M:%S")}</b>
 Он работает уже {datetime.now()-started_at}""", parse_mode="HTML")
 
 
 # Скачка отправленного фото
-@bot_dispather.message(F.photo)
+@bot_dispatcher.message(F.photo)
 async def download_photo(message: types.Message, bot: Bot):
     await bot.download(
         message.photo[-1],
@@ -190,7 +275,7 @@ async def download_photo(message: types.Message, bot: Bot):
 
 # Основной цикл бота
 async def main():
-    await bot_dispather.start_polling(bot)
+    await bot_dispatcher.start_polling(bot)
 
 
 if __name__ == "__main__":
