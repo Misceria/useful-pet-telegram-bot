@@ -48,60 +48,60 @@ async def user_greetings(message: types.Message):
 
 def create_inline_for_generate_password():
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(
+    builder.row(types.InlineKeyboardButton(
         text="Изменить название длины",
         callback_data="change_length")
     )
     if generate_password_settings['special_symbols']:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Отключить спец. символы",
             callback_data="change_special")
         )
     else:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Включить спец. символы",
             callback_data="change_special")
         )
 
     if generate_password_settings['digits']:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Отключить цифры",
             callback_data="change_digits")
         )
     else:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Включить цифры",
             callback_data="change_digits")
         )
 
     if generate_password_settings['Upper']:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Отключить заглавные",
             callback_data="change_upper")
         )
     else:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Включить заглавные",
             callback_data="change_upper")
         )
  
     if generate_password_settings['Lower']:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Отключить прописные",
             callback_data="change_lower")
         )
     else:
-        builder.add(types.InlineKeyboardButton(
+        builder.row(types.InlineKeyboardButton(
             text="Включить прописные",
             callback_data="change_lower")
         )
 
-    builder.add(types.InlineKeyboardButton(
+    builder.row(types.InlineKeyboardButton(
         text="Добавить доп. символы",
         callback_data="change_alphabet")
     )
 
-    builder.add(types.InlineKeyboardButton(
+    builder.row(types.InlineKeyboardButton(
         text="Сгенерировать",
         callback_data="change_generate")
     )
